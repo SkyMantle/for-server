@@ -1,0 +1,33 @@
+[Unit]
+Description=Drone Geo-Localization Web Service
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/path/to/drone-localization-deployment
+ExecStart=/usr/bin/python3 /path/to/drone-localization-deployment/app.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables
+Environment="PATH=/usr/bin:/usr/local/bin"
+Environment="PYTHONUNBUFFERED=1"
+
+# Resource limits (optional)
+MemoryLimit=8G
+CPUQuota=400%
+
+[Install]
+WantedBy=multi-user.target
+
+# Installation instructions:
+# 1. Edit this file and replace YOUR_USERNAME and /path/to/
+# 2. Copy to: sudo cp configs/drone-localization.service /etc/systemd/system/
+# 3. Reload: sudo systemctl daemon-reload
+# 4. Enable: sudo systemctl enable drone-localization
+# 5. Start: sudo systemctl start drone-localization
+# 6. Status: sudo systemctl status drone-localization
+# 7. Logs: sudo journalctl -u drone-localization -f

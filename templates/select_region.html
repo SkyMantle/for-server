@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🖱️ Select Screen Region</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 90vw;
+            max-height: 90vh;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 30px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 30px;
+        }
+
+        .image-container {
+            position: relative;
+            margin-bottom: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .image-container canvas#captureCanvas {
+            display: block;
+            max-width: 100%;
+            width: 100%;
+        }
+
+        .image-container canvas#selectorCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: crosshair;
+        }
+
+        .coords-display {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            width: 100%;
+        }
+
+        .coord-item {
+            text-align: center;
+        }
+
+        .coord-item strong {
+            color: #667eea;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .coord-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .footer {
+            padding: 20px 30px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+
+        .save-btn {
+            background: #667eea;
+            color: white;
+        }
+
+        .save-btn:hover {
+            background: #5568d3;
+        }
+
+        .cancel-btn {
+            background: #999;
+            color: white;
+        }
+
+        .cancel-btn:hover {
+            background: #888;
+        }
+
+        .error {
+            color: red;
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+        }
+
+        video {
+            display: none;
+            /* Hidden video for stream */
+        }
+
+        #start-share-btn {
+            display: block;
+            margin: 20px auto;
+            padding: 15px 30px;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        #start-share-btn:hover {
+            background: #45a049;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖱️ Select Screen Region</h1>
+            <p>Click the button below to share your screen and select a region</p>
+        </div>
+
+        <div class="content">
+            <button id="start-share-btn">Start Screen Share</button>
+
+            <div id="selection-area" class="hidden">
+                <div class="image-container" id="imageContainer">
+                    <canvas id="captureCanvas"></canvas> <!-- Static capture canvas -->
+                    <canvas id="selectorCanvas"></canvas> <!-- Overlay for selection -->
+                </div>
+
+                <div class="coords-display">
+                    <div class="coord-item">
+                        <strong>X</strong>
+                        <div class="coord-value" id="coordX">0</div>
+                    </div>
+                    <div class="coord-item">
+                        <strong>Y</strong>
+                        <div class="coord-value" id="coordY">0</div>
+                    </div>
+                    <div class="coord-item">
+                        <strong>W</strong>
+                        <div class="coord-value" id="coordW">640</div>
+                    </div>
+                    <div class="coord-item">
+                        <strong>H</strong>
+                        <div class="coord-value" id="coordH">420</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer hidden" id="footer">
+            <button class="save-btn" id="saveBtn">💾 Save & Apply</button>
+            <button class="cancel-btn" id="cancelBtn">✕ Cancel</button>
+        </div>
+    </div>
+
+    <video id="videoStream" autoplay playsinline></video> <!-- Hidden video -->
+
+    <script>
+        (function () {
+            console.log('[DEBUG] Screen selector popup opened')
+
+            const startButton = document.getElementById('start-share-btn')
+            const selectionArea = document.getElementById('selection-area')
+            const footer = document.getElementById('footer')
+            const captureCanvas = document.getElementById('captureCanvas')
+            const selectorCanvas = document.getElementById('selectorCanvas')
+            const ctx = selectorCanvas.getContext('2d')
+            const video = document.getElementById('videoStream')
+
+            let isDrawing = false
+            let startX, startY
+            let lastX = 0, lastY = 0, lastW = 640, lastH = 420
+            let stream = null
+
+            // Step 1: Request screen share on button click (user gesture)
+            startButton.addEventListener('click', async () => {
+                console.log('[DEBUG] Start Screen Share button clicked')
+                try {
+                    stream = await navigator.mediaDevices.getDisplayMedia({
+                        video: {
+                            cursor: 'always'  // Include cursor if needed
+                        }
+                    })
+                    console.log('[DEBUG] Stream acquired successfully')
+                    video.srcObject = stream
+                    video.onloadedmetadata = () => {
+                        console.log('[DEBUG] Video metadata loaded')
+                        video.play().then(captureFrame).catch(err => console.error('[DEBUG] Video play error:', err))
+                    }
+                } catch (err) {
+                    selectionArea.innerHTML = '<div class="error">❌ Failed to access screen: ' + err.message + '</div>'
+                    console.error('[DEBUG] getDisplayMedia error:', err)
+                }
+            })
+
+            // Step 2: Capture single frame to static canvas
+            function captureFrame() {
+                console.log('[DEBUG] Capturing frame from video')
+                captureCanvas.width = video.videoWidth
+                captureCanvas.height = video.videoHeight
+                captureCanvas.getContext('2d').drawImage(video, 0, 0)
+
+                // Stop the stream to release resources
+                stream.getTracks().forEach(track => track.stop())
+                video.srcObject = null
+                console.log('[DEBUG] Stream stopped after capture')
+
+                setupSelectorCanvas()
+
+                // Show selection area and footer
+                startButton.style.display = 'none'
+                selectionArea.classList.remove('hidden')
+                footer.classList.remove('hidden')
+                console.log('[DEBUG] Selection area and footer shown')
+            }
+
+            // Step 3: Setup selector canvas overlay
+            function setupSelectorCanvas() {
+                console.log('[DEBUG] Setting up selector canvas, size:', captureCanvas.width, 'x', captureCanvas.height)
+                selectorCanvas.width = captureCanvas.width
+                selectorCanvas.height = captureCanvas.height
+                selectorCanvas.style.width = captureCanvas.offsetWidth + 'px'
+                selectorCanvas.style.height = captureCanvas.offsetHeight + 'px'
+                selectorCanvas.style.background = 'transparent'
+                drawSelection(0, 0, 640, 420)
+                console.log('[DEBUG] Selector canvas ready')
+            }
+
+            function drawSelection(x1, y1, x2, y2) {
+                ctx.clearRect(0, 0, selectorCanvas.width, selectorCanvas.height)
+                const x = Math.min(x1, x2)
+                const y = Math.min(y1, y2)
+                const w = Math.abs(x2 - x1) || 1
+                const h = Math.abs(y2 - y1) || 1
+
+                // Fill
+                ctx.fillStyle = 'rgba(102, 126, 234, 0.15)'
+                ctx.fillRect(x, y, w, h)
+
+                // Border
+                ctx.strokeStyle = '#667eea'
+                ctx.lineWidth = 3
+                ctx.strokeRect(x, y, w, h)
+
+                // Handles
+                ctx.fillStyle = '#667eea'
+                const handles = [
+                    { x: x, y: y },
+                    { x: x + w, y: y },
+                    { x: x, y: y + h },
+                    { x: x + w, y: y + h }
+                ]
+                handles.forEach(h => {
+                    ctx.fillRect(h.x - 6, h.y - 6, 12, 12)
+                })
+
+                document.getElementById('coordX').textContent = Math.round(x)
+                document.getElementById('coordY').textContent = Math.round(y)
+                document.getElementById('coordW').textContent = Math.round(w)
+                document.getElementById('coordH').textContent = Math.round(h)
+
+                lastX = Math.round(x)
+                lastY = Math.round(y)
+                lastW = Math.round(w)
+                lastH = Math.round(h)
+                console.log('[DEBUG] Drew selection: ' + lastX + ',' + lastY + ',' + lastW + ',' + lastH)
+            }
+
+            function getCanvasCoords(e) {
+                const rect = selectorCanvas.getBoundingClientRect()
+                const scaleX = selectorCanvas.width / rect.width
+                const scaleY = selectorCanvas.height / rect.height
+                return {
+                    x: (e.clientX - rect.left) * scaleX,
+                    y: (e.clientY - rect.top) * scaleY
+                }
+            }
+
+            selectorCanvas.addEventListener('mousedown', (e) => {
+                isDrawing = true
+                const c = getCanvasCoords(e)
+                startX = c.x
+                startY = c.y
+                console.log('[DEBUG] Mouse down at ' + startX + ',' + startY)
+            })
+
+            selectorCanvas.addEventListener('mousemove', (e) => {
+                if (!isDrawing) return
+                const c = getCanvasCoords(e)
+                drawSelection(startX, startY, c.x, c.y)
+                console.log('[DEBUG] Mouse move to ' + c.x + ',' + c.y)
+            })
+
+            selectorCanvas.addEventListener('mouseup', () => {
+                isDrawing = false
+                console.log('[DEBUG] Mouse up')
+            })
+
+            document.getElementById('saveBtn').onclick = () => {
+                console.log('[DEBUG] Save clicked, coords:', lastX, lastY, lastW, lastH)
+                window.opener.postMessage({
+                    type: 'region-selected',
+                    x: lastX,
+                    y: lastY,
+                    w: lastW,
+                    h: lastH
+                }, '*')
+                window.close()
+            }
+
+            document.getElementById('cancelBtn').onclick = () => {
+                console.log('[DEBUG] Cancel clicked')
+                if (stream) stream.getTracks().forEach(track => track.stop())
+                window.close()
+            }
+        })();
+    </script>
+</body>
+
+</html>
