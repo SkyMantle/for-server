@@ -15,10 +15,10 @@ import numpy as np
 import requests
 from functools import lru_cache
 import hashlib
-try:
-    import pyautogui
-except ImportError:
-    pyautogui = None
+# try:
+#     import pyautogui
+# except ImportError:
+#     pyautogui = None
 try:
     import cv2
 except ImportError:
