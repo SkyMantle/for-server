@@ -1,0 +1,177 @@
+# 🖱️ Quick Start: Drag-to-Select Screen Area
+
+## In 30 Seconds
+
+```
+1. Run app:
+   source .venv/bin/activate && python start_app.sh
+
+2. Go to "🎥 Real-Time Streaming" tab
+
+3. Click "🖱️ Select Screen Area" button
+   → Screen dims, crosshair cursor appears
+
+4. DRAG to select area
+   → Green rectangle shows what you're selecting
+   → Live coordinates display while dragging
+
+5. RELEASE to confirm
+   → Coordinates auto-populate in the fields
+   
+6. Click "▶️ Start Recording Desktop"
+   → ONLY your selected area is captured!
+
+7. Watch real-time stream
+   → Your selected region only
+   → Live FPS and similarity scores
+
+8. Click "⏹️ Stop Recording" when done
+```
+
+## Visual Flow
+
+```
+┌─────────────────────────────────────┐
+│  Click "Select Screen Area"        │
+└──────────────┬──────────────────────┘
+               ↓
+┌─────────────────────────────────────┐
+│  FULL SCREEN DIMS (30% opacity)    │
+│  Crosshair cursor appears          │
+│  Instructions shown at top         │
+└──────────────┬──────────────────────┘
+               ↓
+┌─────────────────────────────────────┐
+│  DRAG rectangle around area        │
+│  Live coordinates shown            │
+│  Green border preview              │
+└──────────────┬──────────────────────┘
+               ↓
+┌─────────────────────────────────────┐
+│  RELEASE mouse to confirm          │
+│  Window closes                     │
+│  Coordinates populate fields       │
+└──────────────┬──────────────────────┘
+               ↓
+┌─────────────────────────────────────┐
+│  Region X: 640   Region Y: 360     │
+│  Region W: 800   Region H: 600     │
+│  Status: ✅ Region Selected!       │
+└──────────────┬──────────────────────┘
+               ↓
+┌─────────────────────────────────────┐
+│  Click "Start Recording Desktop"   │
+│  Only selected area streams!       │
+└─────────────────────────────────────┘
+```
+
+## Button Locations in UI
+
+```
+Real-Time Streaming Tab:
+├── Search Configuration
+│   ├── Coordinates
+│   ├── Search Radius
+│   └── Grid Size
+├── Algorithm Settings
+│   ├── Algorithm dropdown
+│   └── Comparison dropdown
+├── ⭐ Screen Region Selection ⭐
+│   ├── 🖱️ Select Screen Area  ← CLICK HERE
+│   ├── Region status display
+│   ├── Region Coordinates
+│   │   ├── X, Y inputs
+│   │   └── Width, Height inputs
+│   └── 🗑️ Clear Selection
+├── Recording Controls
+│   ├── ▶️ Start Recording Desktop
+│   └── ⏹️ Stop Recording
+├── Live Desktop Feed
+└── Analysis & Statistics
+```
+
+## Common Scenarios
+
+### 📱 Capture Single Window
+1. Click "🖱️ Select Screen Area"
+2. Drag around your window
+3. Release
+4. Start recording
+→ Only that window streams!
+
+### 🎮 Capture Game Area
+1. Click "🖱️ Select Screen Area"
+2. Drag around game window
+3. Release
+4. Start recording
+→ Game area only (lower CPU!)
+
+### 📊 Capture Dashboard
+1. Click "🖱️ Select Screen Area"
+2. Drag around dashboard/app
+3. Release
+4. Start recording
+→ Dashboard only
+
+### 🖥️ Capture Right Monitor
+1. Click "🖱️ Select Screen Area"
+2. Drag across right monitor
+3. Release
+4. Start recording
+→ Right monitor only
+
+## Pro Tips 💡
+
+| Tip | Benefit |
+|-----|---------|
+| Smaller selections | Lower CPU usage, higher FPS |
+| Use keyboard (ESC) | Cancel anytime without selecting |
+| Try multiple times | No problem changing selection |
+| Click "Clear" | Reset to full screen instantly |
+| Check status box | Shows what region is selected |
+
+## If It Doesn't Work
+
+### Screen overlay doesn't appear?
+```bash
+# Reinstall tkinter
+pip install tk
+
+# Try again
+python start_app.sh
+```
+
+### Coordinates not showing?
+- Drag area must be **at least 50×50 pixels**
+- Try larger selection
+- Check browser console (F12)
+
+### Want to start over?
+- Click "🗑️ Clear Selection"
+- Fields reset to 0
+- Full screen mode active
+
+## What Happens Next
+
+### Before (Full Screen)
+- Captures entire desktop
+- All monitors if multi-monitor
+- Higher CPU usage
+- Larger file sizes
+
+### After (Selected Region)
+- Captures only selected area
+- Lower CPU usage
+- Faster processing
+- Only what you need!
+
+---
+
+## 🚀 That's It!
+
+You now have precise control over what part of your screen gets captured and analyzed!
+
+**Next time you stream:**
+1. Select Screen Area
+2. Start Recording
+3. Enjoy focused, efficient screen capture! 📺✨

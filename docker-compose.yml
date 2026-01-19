@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  drone-localization:
+    build: .
+    container_name: drone-localization
+    ports:
+      - "7860:7860"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - GRADIO_SERVER_NAME=0.0.0.0
+    volumes:
+      - ./cache:/root/.cache  # Cache for models and tiles
+    restart: unless-stopped
+    
+    # For GPU support (requires nvidia-docker)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+# Optional: Add nginx reverse proxy
+#  nginx:
+#    image: nginx:alpine
+#    container_name: drone-nginx
+#    ports:
+#      - "80:80"
+#      - "443:443"
+#    volumes:
+#      - ./configs/nginx.conf:/etc/nginx/conf.d/default.conf
+#    depends_on:
+#      - drone-localization
+#    restart: unless-stopped
