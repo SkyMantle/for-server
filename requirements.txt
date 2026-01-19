@@ -1,13 +1,12 @@
-gradio==4.16.0
-torch==2.9.1
-plotly==5.18.0
-scipy==1.10.1
-opencv-python==4.8.0.76
-pyautogui==0.9.53
 flask==3.0.3
-pillow==10.4.0
+pillow==11.0.0
+torch==2.5.1
 torchvision==0.20.1
-numpy==2.0.2
+numpy==2.1.2
 requests==2.32.3
-mss==9.0.2
-python==3.11.5
+mss==10.0.0
+pyautogui==0.9.54
+opencv-python==4.10.0.84
+scipy==1.14.1
+plotly==5.24.1
+gradio==5.9.1  # Latest stable as of Jan 2026
