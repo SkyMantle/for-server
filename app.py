@@ -5,8 +5,9 @@ import base64
 import threading
 import time
 import os
+import platform
 
-# Import your required libraries (keep all your original imports)
+# Your required libraries (keep all original imports)
 import torch
 import torchvision.transforms as T
 from torchvision.models import resnet50, ResNet50_Weights
@@ -29,11 +30,11 @@ except ImportError:
 
 app = Flask(__name__, template_folder='templates')
 
-# GPU setup (your original)
+# GPU setup
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
-# Model lazy loading (your original code - keep all your functions below)
+# Model lazy loading (keep your original code here - I've left placeholders)
 _model = None
 _model_loaded = False
 def get_model():
@@ -55,46 +56,61 @@ preprocess = T.Compose([
     T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-# ... PASTE ALL YOUR OTHER FUNCTIONS HERE ...
-# (download_satellite_tile_cached, preprocess_image_advanced, extract_embedding,
-# extract_multi_scale_embeddings, extract_augmented_embeddings, compare_images,
-# generate_tile_grid, visualize_search_area, parse_coordinates, localize_drone_image)
+# ... PASTE ALL YOUR OTHER FUNCTIONS HERE (download_satellite_tile, embeddings, compare_images, etc.) ...
 
-# ================== DESKTOP STREAMING GLOBALS ==================
+# ================== SMART DESKTOP CAPTURE ==================
 
-desktop_stream_active = False
-desktop_stream_thread = None
-desktop_stream_lock = threading.Lock()
-desktop_last_frame = None
-desktop_stats = {"fps": 0, "frames": 0}
-desktop_region = None
+# Detect environment: local GUI vs headless server
+IS_HEADLESS = (
+    os.environ.get('DISPLAY') is None or           # No X server (Linux headless)
+    'RAILWAY' in os.environ or                     # Railway env var
+    'RENDER' in os.environ or                      # Render env var
+    platform.system() == 'Linux' and not os.getenv('XDG_SESSION_TYPE')  # Extra Linux headless check
+)
+
+print(f"[INFO] Running in {'HEADLESS' if IS_HEADLESS else 'GUI'} mode (pyautogui: {'available' if pyautogui else 'not available'})")
 
 def capture_desktop_screenshot(region=None):
+    """
+    Smart capture:
+    - Local GUI: prefer pyautogui (better cursor, multi-monitor support)
+    - Headless server: force mss (works without DISPLAY)
+    """
     try:
-        if mss:
-            with mss.mss() as sct:
-                monitor = sct.monitors[1]
-                if region:
-                    x, y, w, h = region
-                    mon = {"top": y, "left": x, "width": w, "height": h}
-                else:
-                    mon = monitor
-                screenshot = sct.grab(mon)
-                return Image.frombytes("RGB", screenshot.size, screenshot.rgb)
-        elif pyautogui:
+        # Prefer pyautogui on local machines with GUI
+        if not IS_HEADLESS and pyautogui:
+            print("[DEBUG] Using pyautogui for capture (local GUI)")
             if region:
                 return pyautogui.screenshot(region=region)
             return pyautogui.screenshot()
+
+        # Headless or pyautogui not available → use mss
+        if not mss:
+            raise RuntimeError("mss library not installed - cannot capture screenshot on headless server")
+
+        print("[DEBUG] Using mss for capture (headless/server mode)")
+        with mss.mss() as sct:
+            monitor = sct.monitors[1]  # primary monitor
+            if region:
+                x, y, w, h = region
+                mon = {"top": y, "left": x, "width": w, "height": h}
+            else:
+                mon = monitor
+            screenshot = sct.grab(mon)
+            return Image.frombytes("RGB", screenshot.size, screenshot.rgb)
+
     except Exception as e:
-        print(f"Screenshot error: {e}")
+        print(f"[ERROR] Screenshot capture failed: {e}")
         return None
+
+# ================== ROUTES ==================
 
 @app.route('/get_screenshot')
 def get_screenshot():
     img = capture_desktop_screenshot()
     if img:
         buf = BytesIO()
-        img.save(buf, format="PNG", optimize=True, quality=75)  # Compress to avoid too large data
+        img.save(buf, format="PNG", optimize=True, quality=75)
         b64 = base64.b64encode(buf.getvalue()).decode('ascii')
         return jsonify({'b64': b64})
     return jsonify({'error': 'Failed to capture screenshot'})
@@ -181,4 +197,6 @@ def stop_capture():
     return jsonify(stop_desktop_capture())
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # Use Railway/Render provided port (important!)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
