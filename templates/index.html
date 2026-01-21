@@ -215,9 +215,9 @@
 						<label for="region-y">Region Y</label>
 						<input type="number" id="region-y" value="0" min="0">
 						<label for="region-w">Region Width</label>
-						<input type="number" id="region-w" value="640" min="50">
+						<input type="number" id="region-w" value="1920" min="50">
 						<label for="region-h">Region Height</label>
-						<input type="number" id="region-h" value="420" min="50">
+						<input type="number" id="region-h" value="1080" min="50">
 					</div>
 					<div class="status" id="region-status">No region selected – full screen</div>
 				</div>
@@ -230,7 +230,7 @@
 				</div>
 			</div>
 			<div class="row">
-				<img id="live-feed" src="" alt="Desktop Screen Capture">
+				<img id="live-feed" src="" alt="Live Desktop Video Stream">
 			</div>
 		</div>
 	</div>
@@ -254,7 +254,7 @@
 				localStorage.setItem('screenshot_b64', data.b64)
 				const popup = window.open('/select_region', 'regionSelector', 'width=1280,height=920,resizable=yes,scrollbars=yes')
 				if (!popup) {
-					alert('Popup blocked! Please allow popups for localhost.')
+					alert('Popup blocked! Please allow popups for this site.')
 					localStorage.removeItem('screenshot_b64')
 				}
 			} else {
@@ -313,7 +313,8 @@
 			const result = await resp.json()
 			document.getElementById('stats-display').textContent = result.status
 			if (result.status.includes('started')) {
-				setInterval(updateFrame, 40)
+				// Use MJPEG stream for smooth video (like Google Meet)
+				document.getElementById('live-feed').src = '/video_stream?' + new Date().getTime() // Cache bust
 				setInterval(updateStats, 1000)
 			}
 		}
@@ -322,17 +323,7 @@
 			const resp = await fetch('/stop_capture', { method: 'POST' })
 			const result = await resp.json()
 			document.getElementById('stats-display').textContent = result.status
-			document.getElementById('live-feed').src = ''
-		}
-
-		function updateFrame() {
-			fetch('/get_frame')
-				.then(response => response.blob())
-				.then(blob => {
-					if (blob.size > 0) {
-						document.getElementById('live-feed').src = URL.createObjectURL(blob)
-					}
-				})
+			document.getElementById('live-feed').src = '' // Stop the video stream
 		}
 
 		function updateStats() {
@@ -341,6 +332,11 @@
 				.then(data => {
 					document.getElementById('stats-display').textContent = data.status_text
 				})
+		}
+
+		function localize() {
+			// Placeholder for your localization function
+			document.getElementById('output-map').innerHTML = '<p>Localization results would appear here.</p>'
 		}
 	</script>
 </body>
