@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, Response, send_file
 from PIL import Image
 from io import BytesIO
 import base64
@@ -7,7 +7,7 @@ import time
 import os
 import platform
 
-# Required libraries (no pyautogui here!)
+# Required libraries
 import torch
 import torchvision.transforms as T
 from torchvision.models import resnet50, ResNet50_Weights
@@ -16,7 +16,7 @@ import requests
 from functools import lru_cache
 import hashlib
 import cv2  # optional
-import mss  # required for headless
+import mss  # required for capture
 
 app = Flask(__name__, template_folder='templates')
 
@@ -24,7 +24,7 @@ app = Flask(__name__, template_folder='templates')
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
-# Model lazy loading (your original - keep all your functions)
+# Model lazy loading (keep your original - placeholder)
 _model = None
 _model_loaded = False
 def get_model():
@@ -46,7 +46,7 @@ preprocess = T.Compose([
     T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-# ... PASTE ALL YOUR OTHER FUNCTIONS HERE (download_satellite_tile, embeddings, compare_images, etc.) ...
+# ... PASTE ALL YOUR OTHER FUNCTIONS HERE (satellite tiles, embeddings, etc.) ...
 
 # ================== DESKTOP STREAMING GLOBALS ==================
 
@@ -57,52 +57,23 @@ desktop_last_frame = None
 desktop_stats = {"fps": 0, "frames": 0}
 desktop_region = None
 
-# Lazy-load pyautogui only when needed (avoids import crash on headless)
-# pyautogui = None
-
-# def load_pyautogui():
-#     global pyautogui
-#     if pyautogui is None:
-#         try:
-#             import pyautogui
-#         except ImportError:
-#             pyautogui = None
-#             print("[WARN] pyautogui not installed or failed to import")
-#     return pyautogui
-
-# Detect environment: local GUI vs headless server
+# Detect headless
 IS_HEADLESS = (
-    os.environ.get('DISPLAY') is None or           # No X server (Linux headless)
-    'RAILWAY' in os.environ or                     # Railway env var
-    'RENDER' in os.environ or                      # Render env var
-    platform.system() == 'Linux' and not os.getenv('XDG_SESSION_TYPE')  # Extra Linux headless check
+    os.environ.get('DISPLAY') is None or
+    'RAILWAY' in os.environ or 'RENDER' in os.environ or
+    platform.system() == 'Linux' and not os.getenv('XDG_SESSION_TYPE')
 )
 
-print(f"[INFO] Running in {'HEADLESS' if IS_HEADLESS else 'GUI'} mode (pyautogui: {'available' if load_pyautogui() else 'not available'})")
+print(f"[INFO] Running in {'HEADLESS' if IS_HEADLESS else 'GUI'} mode")
 
 def capture_desktop_screenshot(region=None):
-    """
-    Smart, safe capture:
-    - Local GUI: prefer pyautogui (lazy import)
-    - Headless server: force mss (works without DISPLAY)
-    """
     try:
-        # Prefer pyautogui on local machines with GUI
-        if not IS_HEADLESS:
-            pag = load_pyautogui()
-            if pag:
-                print("[DEBUG] Using pyautogui for capture (local GUI mode)")
-                if region:
-                    return pag.screenshot(region=region)
-                return pag.screenshot()
-
-        # Headless or pyautogui not available → use mss
         if not mss:
-            raise RuntimeError("mss not installed - cannot capture screenshot on headless server")
+            raise RuntimeError("mss not installed")
         
-        print("[DEBUG] Using mss for capture (headless/server mode)")
+        print("[DEBUG] Using mss for capture")
         with mss.mss() as sct:
-            monitor = sct.monitors[1]  # primary monitor
+            monitor = sct.monitors[1]
             if region:
                 x, y, w, h = region
                 mon = {"top": y, "left": x, "width": w, "height": h}
@@ -110,12 +81,9 @@ def capture_desktop_screenshot(region=None):
                 mon = monitor
             screenshot = sct.grab(mon)
             return Image.frombytes("RGB", screenshot.size, screenshot.rgb)
-
     except Exception as e:
-        print(f"[ERROR] Screenshot capture failed: {e}")
+        print(f"[ERROR] Capture failed: {e}")
         return None
-
-# ================== ROUTES ==================
 
 @app.route('/get_screenshot')
 def get_screenshot():
@@ -125,7 +93,7 @@ def get_screenshot():
         img.save(buf, format="PNG", optimize=True, quality=75)
         b64 = base64.b64encode(buf.getvalue()).decode('ascii')
         return jsonify({'b64': b64})
-    return jsonify({'error': 'Failed to capture screenshot'})
+    return jsonify({'error': 'Failed'})
 
 def start_desktop_capture(data):
     global desktop_stream_active, desktop_stream_thread, desktop_region
@@ -139,7 +107,7 @@ def start_desktop_capture(data):
     h = int(data.get('h', 1080))
     
     if w < 64 or h < 64:
-        return {"status": "❌ Region too small (min 64×64)"}
+        return {"status": "❌ Region too small"}
     
     desktop_region = (x, y, w, h) if (x > 0 or y > 0 or w < 1920 or h < 1080) else None
     desktop_stream_active = True
@@ -159,7 +127,7 @@ def start_desktop_capture(data):
                     desktop_stats["frames"] += frame_count
                     start_time = time.time()
                     frame_count = 0
-            time.sleep(0.04)
+            time.sleep(0.033)  # ~30 fps
     
     desktop_stream_thread = threading.Thread(target=capture_loop, daemon=True)
     desktop_stream_thread.start()
@@ -174,15 +142,24 @@ def stop_desktop_capture():
         desktop_stream_thread.join(timeout=2.0)
     return {"status": "⏹️ Capture stopped"}
 
-@app.route('/get_frame')
-def get_frame():
-    with desktop_stream_lock:
-        if desktop_last_frame:
-            buf = BytesIO()
-            desktop_last_frame.save(buf, format="PNG")
-            buf.seek(0)
-            return send_file(buf, mimetype='image/png')
-    return '', 204
+# MJPEG video stream (smooth "video" like Google Meet)
+def generate_video_stream():
+    while True:  # Keep streaming even if not active - shows black/empty if no frame
+        with desktop_stream_lock:
+            if desktop_last_frame:
+                buf = BytesIO()
+                desktop_last_frame.save(buf, format="JPEG", quality=80, optimize=True)
+                frame = buf.getvalue()
+            else:
+                # Send empty frame if not active
+                frame = b''  # or a placeholder image
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        time.sleep(0.033)
+
+@app.route('/video_stream')
+def video_stream():
+    return Response(generate_video_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/get_stats')
 def get_stats():
