@@ -69,20 +69,28 @@ print(f"[INFO] Running in {'HEADLESS' if IS_HEADLESS else 'GUI'} mode")
 def capture_desktop_screenshot(region=None):
     try:
         if not mss:
-            raise RuntimeError("mss not installed")
-        
-        print("[DEBUG] Using mss for capture")
+            raise RuntimeError("mss library not installed")
+
         with mss.mss() as sct:
-            monitor = sct.monitors[1]
+            print(f"[DEBUG] Available monitors: {sct.monitors}")  # Log for debugging
+            
+            # Use monitor 0 (virtual/full desktop) on headless - safer than monitor[1]
+            monitor = sct.monitors[0] if len(sct.monitors) > 0 else None
+            if not monitor:
+                raise RuntimeError("No monitors detected by mss")
+
             if region:
                 x, y, w, h = region
                 mon = {"top": y, "left": x, "width": w, "height": h}
             else:
                 mon = monitor
+            
+            print(f"[DEBUG] Capturing monitor: {mon}")
             screenshot = sct.grab(mon)
-            return Image.frombytes("RGB", screenshot.size, screenshot.rgb)
+            img = Image.frombytes("RGB", screenshot.size, screenshot.rgb)
+            return img
     except Exception as e:
-        print(f"[ERROR] Capture failed: {e}")
+        print(f"[ERROR] Screenshot capture failed: {type(e).__name__}: {e}")
         return None
 
 @app.route('/get_screenshot')
@@ -93,7 +101,7 @@ def get_screenshot():
         img.save(buf, format="PNG", optimize=True, quality=75)
         b64 = base64.b64encode(buf.getvalue()).decode('ascii')
         return jsonify({'b64': b64})
-    return jsonify({'error': 'Failed'})
+    return jsonify({'error': 'Failed to capture screenshot - check server logs'})
 
 def start_desktop_capture(data):
     global desktop_stream_active, desktop_stream_thread, desktop_region
