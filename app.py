@@ -7,7 +7,7 @@ import time
 import os
 import platform
 
-# Your required libraries (keep all original imports)
+# Required libraries (no pyautogui here!)
 import torch
 import torchvision.transforms as T
 from torchvision.models import resnet50, ResNet50_Weights
@@ -15,18 +15,8 @@ import numpy as np
 import requests
 from functools import lru_cache
 import hashlib
-# try:
-#     import pyautogui
-# except ImportError:
-#     pyautogui = None
-try:
-    import cv2
-except ImportError:
-    cv2 = None
-try:
-    import mss
-except ImportError:
-    mss = None
+import cv2  # optional
+import mss  # required for headless
 
 app = Flask(__name__, template_folder='templates')
 
@@ -34,7 +24,7 @@ app = Flask(__name__, template_folder='templates')
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
-# Model lazy loading (keep your original code here - I've left placeholders)
+# Model lazy loading (your original - keep all your functions)
 _model = None
 _model_loaded = False
 def get_model():
@@ -58,7 +48,27 @@ preprocess = T.Compose([
 
 # ... PASTE ALL YOUR OTHER FUNCTIONS HERE (download_satellite_tile, embeddings, compare_images, etc.) ...
 
-# ================== SMART DESKTOP CAPTURE ==================
+# ================== DESKTOP STREAMING GLOBALS ==================
+
+desktop_stream_active = False
+desktop_stream_thread = None
+desktop_stream_lock = threading.Lock()
+desktop_last_frame = None
+desktop_stats = {"fps": 0, "frames": 0}
+desktop_region = None
+
+# Lazy-load pyautogui only when needed (avoids import crash on headless)
+pyautogui = None
+
+def load_pyautogui():
+    global pyautogui
+    if pyautogui is None:
+        try:
+            import pyautogui
+        except ImportError:
+            pyautogui = None
+            print("[WARN] pyautogui not installed or failed to import")
+    return pyautogui
 
 # Detect environment: local GUI vs headless server
 IS_HEADLESS = (
@@ -68,26 +78,28 @@ IS_HEADLESS = (
     platform.system() == 'Linux' and not os.getenv('XDG_SESSION_TYPE')  # Extra Linux headless check
 )
 
-print(f"[INFO] Running in {'HEADLESS' if IS_HEADLESS else 'GUI'} mode (pyautogui: {'available' if pyautogui else 'not available'})")
+print(f"[INFO] Running in {'HEADLESS' if IS_HEADLESS else 'GUI'} mode (pyautogui: {'available' if load_pyautogui() else 'not available'})")
 
 def capture_desktop_screenshot(region=None):
     """
-    Smart capture:
-    - Local GUI: prefer pyautogui (better cursor, multi-monitor support)
+    Smart, safe capture:
+    - Local GUI: prefer pyautogui (lazy import)
     - Headless server: force mss (works without DISPLAY)
     """
     try:
         # Prefer pyautogui on local machines with GUI
-        if not IS_HEADLESS and pyautogui:
-            print("[DEBUG] Using pyautogui for capture (local GUI)")
-            if region:
-                return pyautogui.screenshot(region=region)
-            return pyautogui.screenshot()
+        if not IS_HEADLESS:
+            pag = load_pyautogui()
+            if pag:
+                print("[DEBUG] Using pyautogui for capture (local GUI mode)")
+                if region:
+                    return pag.screenshot(region=region)
+                return pag.screenshot()
 
         # Headless or pyautogui not available → use mss
         if not mss:
-            raise RuntimeError("mss library not installed - cannot capture screenshot on headless server")
-
+            raise RuntimeError("mss not installed - cannot capture screenshot on headless server")
+        
         print("[DEBUG] Using mss for capture (headless/server mode)")
         with mss.mss() as sct:
             monitor = sct.monitors[1]  # primary monitor
@@ -197,6 +209,5 @@ def stop_capture():
     return jsonify(stop_desktop_capture())
 
 if __name__ == '__main__':
-    # Use Railway/Render provided port (important!)
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
