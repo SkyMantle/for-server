@@ -58,17 +58,17 @@ desktop_stats = {"fps": 0, "frames": 0}
 desktop_region = None
 
 # Lazy-load pyautogui only when needed (avoids import crash on headless)
-pyautogui = None
+# pyautogui = None
 
-def load_pyautogui():
-    global pyautogui
-    if pyautogui is None:
-        try:
-            import pyautogui
-        except ImportError:
-            pyautogui = None
-            print("[WARN] pyautogui not installed or failed to import")
-    return pyautogui
+# def load_pyautogui():
+#     global pyautogui
+#     if pyautogui is None:
+#         try:
+#             import pyautogui
+#         except ImportError:
+#             pyautogui = None
+#             print("[WARN] pyautogui not installed or failed to import")
+#     return pyautogui
 
 # Detect environment: local GUI vs headless server
 IS_HEADLESS = (
